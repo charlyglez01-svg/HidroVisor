@@ -142,7 +142,7 @@ router.post('/registro', async (req, res) => {
 // Nota: los mensajes de error para "usuario no encontrado" y "contraseña
 // incorrecta" son idénticos a propósito — evita enumerar usuarios válidos.
 // =============================================================================
-router.post('/login', async (req, res) => {
+router.post('/login', async function(req, res, next) {
   try {
     const { email, password } = req.body;
 

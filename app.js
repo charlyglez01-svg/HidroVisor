@@ -20,7 +20,7 @@ var app = express();
 // --- CONEXIÓN A MONGODB ---
 // Conectamos a la base de datos local del proyecto HidroVisor.
 // La cadena de conexión debería moverse a process.env.MONGO_URI en producción.
-mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://rafael_db:-F6MMN%xZF9d@LB@cluster0.x65yozc.mongodb.net/?appName=Cluster0')
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('Conectado a MongoDB Atlas en la nube'))
   .catch(err => console.error('Error conectando a Mongo:', err));
 

@@ -1,0 +1,98 @@
+<!-- 
+  views/partials/auth-modal.ejs
+  Modal de autenticación (login + registro con toggle).
+-->
+
+<div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content auth-modal-content">
+
+      <button type="button" class="auth-close" data-bs-dismiss="modal" aria-label="Cerrar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+
+      <div class="auth-modal-body">
+
+        <div class="auth-brand">
+          <img src="/images/logo.png" alt="HidroVisor" class="auth-brand-logo">
+          <div class="auth-brand-text">
+            <span class="auth-brand-title">Hidro<em>Visor</em></span>
+            <span class="auth-brand-sub">Sistema de Monitorización Hídrica</span>
+          </div>
+        </div>
+
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab active" data-auth-mode="login">
+            Iniciar Sesión
+          </button>
+          <button type="button" class="auth-tab" data-auth-mode="signup">
+            Crear Cuenta
+          </button>
+          <span class="auth-tab-indicator"></span>
+        </div>
+
+        <div class="auth-msg" id="authMsg"></div>
+
+        <form class="auth-form" id="authFormLogin" novalidate>
+          <div class="auth-field">
+            <label for="loginEmail">Correo electrónico</label>
+            <input type="email" id="loginEmail" name="email" autocomplete="email" required
+                   placeholder="tucorreo@ejemplo.com">
+          </div>
+          <div class="auth-field">
+            <label for="loginPassword">Contraseña</label>
+            <input type="password" id="loginPassword" name="password" autocomplete="current-password" required
+                   placeholder="••••••••">
+          </div>
+          <button type="submit" class="auth-submit-btn">
+            <span class="auth-submit-text">Entrar</span>
+            <span class="auth-submit-spinner"></span>
+          </button>
+          <p class="auth-switch-hint">
+            ¿No tienes cuenta?
+            <a href="#" class="auth-switch-link" data-switch-to="signup">Crear una ahora</a>
+          </p>
+        </form>
+
+        <form class="auth-form" id="authFormSignup" novalidate style="display:none;">
+          <div class="auth-field">
+            <label for="signupNombre">Nombre</label>
+            <input type="text" id="signupNombre" name="nombre" autocomplete="name" required
+                   placeholder="Tu nombre" minlength="2" maxlength="60">
+          </div>
+          <div class="auth-field">
+            <label for="signupEmail">Correo electrónico</label>
+            <input type="email" id="signupEmail" name="email" autocomplete="email" required
+                   placeholder="tucorreo@ejemplo.com">
+          </div>
+          <div class="auth-field">
+            <label for="signupPassword">Contraseña (mínimo 8 caracteres)</label>
+            <input type="password" id="signupPassword" name="password" autocomplete="new-password" required
+                   placeholder="••••••••" minlength="8">
+          </div>
+          <div class="auth-field">
+            <label for="signupPassword2">Repite la contraseña</label>
+            <input type="password" id="signupPassword2" name="password2" autocomplete="new-password" required
+                   placeholder="••••••••">
+          </div>
+          <button type="submit" class="auth-submit-btn">
+            <span class="auth-submit-text">Crear cuenta</span>
+            <span class="auth-submit-spinner"></span>
+          </button>
+          <p class="auth-switch-hint">
+            ¿Ya tienes cuenta?
+            <a href="#" class="auth-switch-link" data-switch-to="login">Iniciar sesión</a>
+          </p>
+        </form>
+
+        <p class="auth-privacy">
+          Tus datos se almacenan cifrados. Solo se usan para guardar tus preferencias.
+        </p>
+
+      </div>
+    </div>
+  </div>
+</div>

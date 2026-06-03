@@ -1,0 +1,194 @@
+<%# =========================================================================
+   svg_visuals.ejs - LIBRERÍA CENTRAL DE COMPONENTES VISUALES
+   Este archivo aloja todos los SVGs decorativos para mantener los códigos 
+   lo más limpios posibles. Se renderiza un bloque u otro según la variable "tipo".
+========================================================================= %>
+
+<%# ============================================================
+    VISORES GRANDES DE LAS SECCIONES DE INICIO (index.ejs)
+============================================================ %>
+
+<% if (tipo === 'embalses') { %>
+  <div class="fs-visual-card">
+    <div class="fvc-header">
+      <span class="fvc-dot red"></span><span class="fvc-dot yellow"></span><span class="fvc-dot green"></span>
+      <span class="fvc-title">Mapa de Embalses · España</span>
+    </div>
+    <div class="fvc-map-preview">
+      <svg viewBox="0 0 500 380" xmlns="http://www.w3.org/2000/svg" class="spain-preview-svg">
+        <defs>
+          <radialGradient id="mapGlow" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="rgba(0,200,240,0.12)" />
+            <stop offset="100%" stop-color="rgba(0,200,240,0)" />
+          </radialGradient>
+          <filter id="pinGlow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+        <rect width="500" height="380" fill="url(#mapGlow)" />
+        <g stroke="rgba(0,200,240,0.06)" stroke-width="1">
+          <line x1="0" y1="95" x2="500" y2="95" /><line x1="0" y1="190" x2="500" y2="190" />
+          <line x1="0" y1="285" x2="500" y2="285" /><line x1="125" y1="0" x2="125" y2="380" />
+          <line x1="250" y1="0" x2="250" y2="380" /><line x1="375" y1="0" x2="375" y2="380" />
+        </g>
+        <path d="M60,80 L90,60 L140,55 L200,50 L260,48 L310,52 L360,60 L400,75 L430,95 L445,120 L440,150 L430,175 L420,200 L415,225 L400,250 L380,270 L350,285 L310,295 L280,300 L250,298 L220,295 L190,288 L160,275 L130,260 L100,240 L75,215 L60,190 L50,160 L48,130 L55,100 Z"
+              fill="none" stroke="rgba(0,200,240,0.2)" stroke-width="1.5" />
+        <circle cx="200" cy="180" r="22" fill="rgba(0,200,240,0.15)" stroke="rgba(0,200,240,0.4)" stroke-width="1.5" />
+        <text x="200" y="185" text-anchor="middle" fill="rgba(0,200,240,0.9)" font-size="11" font-family="Chakra Petch">47</text>
+        <circle cx="300" cy="140" r="18" fill="rgba(0,200,240,0.12)" stroke="rgba(0,200,240,0.35)" stroke-width="1.5" />
+        <text x="300" y="145" text-anchor="middle" fill="rgba(0,200,240,0.9)" font-size="10" font-family="Chakra Petch">31</text>
+        <circle cx="150" cy="240" r="14" fill="rgba(0,200,240,0.1)" stroke="rgba(0,200,240,0.3)" stroke-width="1.5" />
+        <text x="150" y="245" text-anchor="middle" fill="rgba(0,200,240,0.9)" font-size="9" font-family="Chakra Petch">18</text>
+        <g filter="url(#pinGlow)">
+          <circle cx="120" cy="160" r="5" fill="#00e5a3" /><circle cx="120" cy="160" r="3" fill="#fff" opacity=".7" />
+          <circle cx="260" cy="200" r="5" fill="#f59e0b" /><circle cx="260" cy="200" r="3" fill="#fff" opacity=".7" />
+          <circle cx="350" cy="220" r="5" fill="#00e5a3" /><circle cx="350" cy="220" r="3" fill="#fff" opacity=".7" />
+          <circle cx="180" cy="110" r="5" fill="#f43f5e" /><circle cx="180" cy="110" r="3" fill="#fff" opacity=".7" />
+          <circle cx="370" cy="160" r="5" fill="#00e5a3" /><circle cx="370" cy="160" r="3" fill="#fff" opacity=".7" />
+          <circle cx="90"  cy="200" r="5" fill="#f59e0b" /><circle cx="90"  cy="200" r="3" fill="#fff" opacity=".7" />
+          <circle cx="240" cy="260" r="5" fill="#00e5a3" /><circle cx="240" cy="260" r="3" fill="#fff" opacity=".7" />
+          <circle cx="320" cy="90"  r="5" fill="#f59e0b" /><circle cx="320" cy="90"  r="3" fill="#fff" opacity=".7" />
+        </g>
+        <circle cx="220" cy="170" r="80" fill="none" stroke="rgba(0,200,240,0.07)" stroke-width="1" stroke-dasharray="4 4" />
+        <circle cx="220" cy="170" r="50" fill="none" stroke="rgba(0,200,240,0.1)" stroke-width="1" />
+      </svg>
+    </div>
+  </div>
+
+<% } else if (tipo === 'rios') { %>
+  <div class="fs-visual-card">
+    <div class="fvc-header">
+      <span class="fvc-dot red"></span><span class="fvc-dot yellow"></span><span class="fvc-dot green"></span>
+      <span class="fvc-title">Visor de Ríos · Cuencas Principales</span>
+    </div>
+    <div class="fvc-map-preview" style="display:flex;justify-content:center;align-items:center;">
+      <svg viewBox="0 0 500 380" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;">
+        <rect width="500" height="380" fill="url(#mapGlow)" />
+        <path d="M50,150 Q150,100 250,200 T450,150" fill="none" stroke="#00c8f0" stroke-width="4" stroke-linecap="round"/>
+        <path d="M100,300 Q200,320 300,250 T500,250" fill="none" stroke="#1a6cff" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+        <path d="M150,50 Q250,20 300,100" fill="none" stroke="#00e5a3" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <circle cx="250" cy="200" r="6" fill="#fff" stroke="#00c8f0" stroke-width="2" />
+        <circle cx="300" cy="250" r="5" fill="#fff" stroke="#1a6cff" stroke-width="2" />
+      </svg>
+    </div>
+  </div>
+
+<% } else if (tipo === 'estadisticas') { %>
+  <div class="stats-preview-visual">
+    <div class="spv-header">
+      <span class="spv-title">Llenado por Cuenca Hidrográfica</span>
+      <span class="spv-badge">MITECO</span>
+    </div>
+    <div class="spv-bars">
+      <div class="spv-row"><span class="spv-label">Ebro</span><div class="spv-bar-track"><div class="spv-bar-fill" style="width:72%;background:var(--status-good)"></div></div><span class="spv-pct" style="color:var(--status-good)">72%</span></div>
+      <div class="spv-row"><span class="spv-label">Duero</span><div class="spv-bar-track"><div class="spv-bar-fill" style="width:58%;background:var(--status-avg)"></div></div><span class="spv-pct" style="color:var(--status-avg)">58%</span></div>
+      <div class="spv-row"><span class="spv-label">Tajo</span><div class="spv-bar-track"><div class="spv-bar-fill" style="width:45%;background:var(--status-avg)"></div></div><span class="spv-pct" style="color:var(--status-avg)">45%</span></div>
+      <div class="spv-row"><span class="spv-label">Guadalquivir</span><div class="spv-bar-track"><div class="spv-bar-fill" style="width:38%;background:var(--status-bad)"></div></div><span class="spv-pct" style="color:var(--status-bad)">38%</span></div>
+      <div class="spv-row"><span class="spv-label">Segura</span><div class="spv-bar-track"><div class="spv-bar-fill" style="width:81%;background:var(--status-good)"></div></div><span class="spv-pct" style="color:var(--status-good)">81%</span></div>
+    </div>
+    <div class="spv-footer">Datos representativos · Actualización semanal</div>
+  </div>
+
+<% } else if (tipo === 'aemet') { %>
+  <div class="fs-visual-card">
+    <div class="fvc-header">
+      <span class="fvc-dot red"></span><span class="fvc-dot yellow"></span><span class="fvc-dot green"></span>
+      <span class="fvc-title">Monitorización Meteorológica AEMET</span>
+    </div>
+    <div class="fvc-map-preview" style="display:flex; justify-content:center; align-items:center;">
+      <svg viewBox="0 0 500 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+        <rect width="500" height="380" fill="url(#mapGlow)" />
+        <circle cx="250" cy="190" r="120" fill="none" stroke="rgba(0,200,240,0.15)" stroke-width="1" stroke-dasharray="8 8"/>
+        <circle cx="250" cy="190" r="80" fill="none" stroke="rgba(0,200,240,0.2)" stroke-width="1" />
+        <circle cx="250" cy="190" r="40" fill="rgba(0,200,240,0.05)" stroke="rgba(0,200,240,0.4)" stroke-width="1"/>
+        <line x1="250" y1="70" x2="250" y2="310" stroke="rgba(0,200,240,0.1)" stroke-width="1"/>
+        <line x1="130" y1="190" x2="370" y2="190" stroke="rgba(0,200,240,0.1)" stroke-width="1"/>
+        <path d="M 280,150 Q 320,120 340,160 Q 300,190 280,150" fill="rgba(244,63,94,0.6)" filter="blur(4px)"/>
+        <path d="M 180,220 Q 200,180 230,240 Q 200,260 180,220" fill="rgba(0,229,163,0.5)" filter="blur(3px)"/>
+      </svg>
+    </div>
+  </div>
+
+<% } else if (tipo === 'mapas') { %>
+  <div class="fs-visual-card">
+    <div class="fvc-header">
+      <span class="fvc-dot red"></span><span class="fvc-dot yellow"></span><span class="fvc-dot green"></span>
+      <span class="fvc-title">Mapas Temáticos</span>
+    </div>
+    <div class="fvc-map-preview" style="display:flex; justify-content:center; align-items:center;">
+      <svg viewBox="0 0 500 380" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+        <rect width="500" height="380" fill="url(#mapGlow)" />
+        <g transform="translate(150, 60)">
+          <polygon points="100,50 250,110 100,170 -50,110" fill="rgba(0,200,240,0.1)" stroke="#00c8f0" stroke-width="2"/>
+          <polygon points="100,90 250,150 100,210 -50,150" fill="rgba(244,63,94,0.15)" stroke="#f43f5e" stroke-width="2"/>
+          <circle cx="100" cy="150" r="10" fill="rgba(244,63,94,0.7)"/>
+          <circle cx="180" cy="120" r="15" fill="rgba(244,63,94,0.5)"/>
+          <polygon points="100,130 250,190 100,250 -50,190" fill="rgba(0,229,163,0.1)" stroke="#00e5a3" stroke-width="2"/>
+          <line x1="100" y1="50" x2="100" y2="250" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="4 4"/>
+          <line x1="250" y1="110" x2="250" y2="190" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="4 4"/>
+          <line x1="-50" y1="110" x2="-50" y2="190" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="4 4"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+<%# =========================================================================
+    ICONOS PEQUEÑOS (index.ejs)
+========================================================================= %>
+
+<% } else if (tipo === 'inicializando') { %>
+  <svg class="loader-drop" viewBox="0 0 80 100" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="dropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#00c8f0" />
+        <stop offset="100%" style="stop-color:#1a6cff" />
+      </linearGradient>
+    </defs>
+    <path d="M40 8 C40 8 8 50 8 68 a32 32 0 0 0 64 0 C72 50 40 8 40 8z"
+          fill="none" stroke="url(#dropGrad)" stroke-width="2.5"
+          stroke-dasharray="220" stroke-dashoffset="220" stroke-linecap="round">
+      <animate attributeName="stroke-dashoffset" from="220" to="0" dur="1.8s" repeatCount="indefinite" />
+    </path>
+  </svg>
+
+<% } else if (tipo === 'ayuda') { %>
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+
+<% } else if (tipo === 'sesion') { %>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+
+<% } else if (tipo === 'icono-flecha') { %>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <path d="M5 12h14M12 5l7 7-7 7" />
+  </svg>
+
+<%# =========================================================================
+    ICONOS (map.js)
+========================================================================= %>
+
+<% } else if (tipo === 'sprites-mapa') { %>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+    
+    <symbol id="icon-gota-embalse" viewBox="0 0 24 24">
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" stroke="#1a2638" stroke-width="1.5"></path>
+      <circle cx="12" cy="14" r="3" fill="#ffffff" opacity="0.8"></circle>
+    </symbol>
+
+    <symbol id="icon-rio" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" fill="#00d4ff" stroke="#1a2638" stroke-width="1.5"></circle>
+      <path d="M7 11c1.5 0 2.5 2 4 2s2.5-2 4-2 2.5 2 4 2" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"></path>
+      <path d="M5 15c1.5 0 2.5 2 4 2s2.5-2 4-2 2.5 2 4 2" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.6"></path>
+    </symbol>
+
+  </svg>
+
+<% } %>

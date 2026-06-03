@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<%# ============================================================
+    HidroVisor — index.ejs
+    Plantilla principal de la aplicación (SPA de 6 secciones)
+
+    SECCIONES:
+      1. secInicio        — Landing page con hero, features y footer
+      2. secPantanos      — Mapa interactivo de embalses (Leaflet)
+      3. secRios          — Cards con datos de los ríos principales
+      4. secEstadisticas  — Dashboard analítico nacional
+      5. secNoticias      — Predicción AEMET + mapa de temperaturas
+      6. secMapas         — Catálogo de visores temáticos
+
+    DEPENDENCIAS (cargadas al final del body):
+      Bootstrap 5.3, Leaflet 1.9, MarkerCluster, Chart.js
+      config.js, map.js, tiempo.js, ui.js, auth.js
+    ============================================================ %>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HidroVisor — Sistema de Monitorización Hídrica Nacional</title>
+  <meta name="description" content="Plataforma nacional de monitorización hídrica en tiempo real. Datos oficiales MITECO.">
+
+  <link rel="icon" type="image/png" href="/images/logo.png">
+
+  <%# Tipografías: Chakra Petch (display/títulos), Outfit (cuerpo), JetBrains Mono (datos numéricos) %>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <%# Frameworks y librerías de componentes %>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+
+  <%# Estilos propios del proyecto %>
+  <link rel="stylesheet" href="/stylesheets/style.css" />
+  <link rel="stylesheet" href="/stylesheets/auth.css" />  
+</head>
+
+<body>
+
+  <%# Textura de grano sobre toda la página (efecto visual, aria-hidden para lectores) %>
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <%# Iconos svg de map.js %>
+  <%- include('partials/svg_visuals', { tipo: 'sprites-mapa' }) %>
+
+  <%# ══════════════════════════════════════════════════
+      LOADER — Pantalla de carga inicial
+      Animación SVG de una gota + barra de progreso.
+      Se oculta desde ui.js con hideLoader() una vez
+      que los datos de embalses están disponibles.
+  ══════════════════════════════════════════════════ %>
+  <div id="appLoader" class="loader-overlay">
+    <div class="text-center">
+      <%- include('partials/svg_visuals', { tipo: 'inicializando' }) %>
+      <div class="loader-text">Inicializando</div>
+      <div class="loader-progress"><div class="loader-bar"></div></div>
+    </div>
+  </div>
+
+  <%# Overlay oscuro detrás del sidebar en móvil — cierra al tocar %>
+  <div id="mobileOverlay" class="mobile-overlay" onclick="toggleSidebar()"></div>
+
+  <%# ══════════════════════════════════════════════════
+      HEADER — Barra de navegación principal
+      Contiene: logo, indicador actualizado, pestañas (desktop),
+      botón ayuda, menú de usuario y botón de acceso.
+  ══════════════════════════════════════════════════ %>
+
+  <header class="app-header" id="appHeader">
+
+    <%# Logo + nombre %>
+    <div class="h-logo d-flex align-items-center gap-2" style="flex-shrink:0;">
+      <button class="hamburger-btn d-md-none" onclick="toggleSidebar()">
+        <span></span><span></span><span></span>
+      </button>
+      <img src="/images/logo.png" alt="HidroVisor" class="nav-logo">
+      <div class="d-flex flex-column justify-content-center">
+        <span class="logo-tx">Hidro<span>Visor</span></span>
+        <span class="logo-tagline d-none d-sm-block">Monitorización Hídrica · España</span>
+      </div>
+    </div>
+
+    <%# Indicador de estado "Actualizado" %>
+    <div class="live-indicator d-none d-lg-flex ms-3">Actualizado</div>
+
+    <%# Pestañas de navegación entre secciones (desktop) %>
+    <nav class="main-nav d-none d-md-flex align-items-center ms-auto">
+      <button class="nav-tab active" onclick="goToSection('inicio')"        id="navInicio">Inicio</button>
+      <button class="nav-tab"        onclick="goToSection('pantanos')"      id="navPantanos">Embalses</button>
+      <button class="nav-tab"        onclick="goToSection('rios')"          id="navRios">Ríos</button>
+
+      <button class="nav-tab auth-locked" onclick="goToSection('estadisticas')" id="navEstadisticas">Estadísticas</button>
+      <button class="nav-tab auth-locked" onclick="goToSection('noticias')" id="navNoticias">Aemet</button>
+      <button class="nav-tab auth-locked" onclick="goToSection('mapas')" id="navMapas">Mapas Temáticos</button>
+    </nav>
+
+    <%# Controles de la derecha: ayuda, usuario y acceso %>
+    <div class="d-flex align-items-center gap-2 ms-3" style="flex-shrink:0;">
+
+      <%# Botón de ayuda abre la guía %>
+      <button class="btn btn-sm border-0 d-none d-sm-flex align-items-center header-icon-btn" data-bs-toggle="modal" data-bs-target="#helpModal" title="Ayuda">
+        <%- include('partials/svg_visuals', { tipo: 'ayuda' }) %>
+      </button>
+
+      <%# Menú de usuario (visible solo cuando hay sesión iniciada) %>
+      <div class="user-menu" id="ubadge">
+        <div class="user-info">
+          <div class="uav" id="uav">U</div>
+          <span class="d-none d-md-block uname-text" id="uname">Usuario</span>
+          <span class="uarrow">▾</span>
+        </div>
+        <div class="dropdown-menu-custom">
+          <hr>
+          <button type="button" class="logout-btn" onclick="HV_Auth.logout()" style="background:none;border:none;color:inherit;font:inherit;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;">
+            Cerrar Sesión <%- include('partials/svg_visuals', { tipo: 'sesion' }) %>
+          </button>
+        </div>
+      </div>
+
+      <%# Botón de acceso abre el login %>
+      <button class="btn-acceder" id="btnLogin" data-bs-toggle="modal" data-bs-target="#authModal">
+        Acceder
+      </button>
+    </div>
+  </header>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 1: INICIO (LANDING)
+      Contiene: hero, marquesina, 5 secciones y footer.
+      Es la única sección con scroll interno propio.
+  ══════════════════════════════════════════════════ %>
+  <section id="secInicio" class="section-page active">
+
+    <%# Hero principal con grid de fondo y contenido central %>
+    <div class="hero-section" id="heroSection">
+      <div class="hero-overlay"></div>
+      <div class="hero-grid" aria-hidden="true"></div>
+
+      <div class="hero-content">
+        <div class="hero-badge reveal">
+          <span class="badge-dot"></span>
+          Sistema Oficial · Datos en Tiempo Real
+        </div>
+        <h1 class="hero-title reveal reveal-delay-1">
+          Hidro<em>Visor</em>
+        </h1>
+        <p class="hero-subtitle reveal reveal-delay-2">
+          Plataforma nacional de monitorización hídrica de España.<br>
+          Datos oficiales del MITECO actualizados semanalmente.
+        </p>
+
+        <%# KPIs del hero — se rellenan dinámicamente desde renderLanding() en ui.js %>
+        <div class="hero-kpis reveal reveal-delay-3" id="landingStats">
+          <div class="kpi-item">
+            <span class="kpi-val" id="lstEmbalses">—</span>
+            <span class="kpi-label">Embalses</span>
+          </div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-item">
+            <span class="kpi-val" id="lstCuencas">—</span>
+            <span class="kpi-label">Cuencas</span>
+          </div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-item">
+            <span class="kpi-val" id="lstMedia">—</span>
+            <span class="kpi-label">Llenado Medio</span>
+          </div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-item">
+            <span class="kpi-val" id="lstFecha">—</span>
+            <span class="kpi-label">Actualización</span>
+          </div>
+        </div>
+      </div>
+
+      <%# Flecha animada para indicar que hay contenido abajo %>
+      <div class="scroll-indicator" onclick="document.getElementById('marqueeSection').scrollIntoView({behavior:'smooth'})">
+        <div class="scroll-line"></div>
+        <span>Desliza para explorar</span>
+      </div>
+    </div>
+
+  <%# Cinta pasante de texto: Índice continuo de las 5 secciones de la plataforma %>
+    <div class="marquee-section" id="marqueeSection">
+      <div class="marquee-inner">
+        <div class="marquee-track" id="marqueeTrack">
+          
+          <span class="mq-item"> Fuente Oficial <em>MITECO</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>01.</strong> Red de <em>Embalses</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>02.</strong> Red <em>Fluvial</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>03.</strong> Análisis <em>Cuantitativo</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>04.</strong> Sistema Climático <em>AEMET</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>05.</strong> Catálogo de <em>Mapas Temáticos</em></span>
+          <span class="mq-sep">✦</span>
+          <%# Duplicado para que el scroll sea continuo sin saltos %>
+          <span class="mq-item"> Fuente Oficial <em>MITECO</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>01.</strong> Red de <em>Embalses</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>02.</strong> Red <em>Fluvial</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>03.</strong> Análisis <em>Cuantitativo</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>04.</strong> Sistema Climático <em>AEMET</em></span>
+          <span class="mq-sep">✦</span>
+          <span class="mq-item"><strong>05.</strong> Catálogo de <em>Mapas Temáticos</em></span>
+          <span class="mq-sep">✦</span>
+        </div>
+      </div>
+    </div>
+
+    <%# FEATURE 01: Mapa de Embalses %>
+    <div class="feature-section fs-dark">
+      <div class="fs-bg-orb fs-orb-left"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row align-items-center g-5" style="min-height:75vh;">
+
+          <div class="col-lg-5 reveal reveal-left">
+            <div class="fs-label">01 — Red de Embalses</div>
+            <h2 class="fs-title">Más de <span class="gradient-text" id="fs-embalse-count">370</span> embalses en tiempo real</h2>
+            <p class="fs-body">
+              Explora el estado de los embalses de toda España sobre cartografía interactiva.
+              Filtra por comunidad autónoma o nombre del embalse, visualiza clústeres dinámicos y activa
+              el radar de precipitaciones animado de RainViewer.
+            </p>
+            <ul class="fs-features">
+              <li><span class="ff-dot" style="background:var(--status-good)"></span>Datos MITECO actualizados semanalmente</li>
+              <li><span class="ff-dot" style="background:var(--accent-cyan)"></span>Radar de lluvia RainViewer en tiempo real</li>
+              <li><span class="ff-dot" style="background:var(--status-avg)"></span>Capas satélite PNOA e IGN Base</li>
+            </ul>
+            <button class="btn-feature" onclick="goToSection('pantanos')">
+              Abrir Mapa Interactivo <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+            </button>
+          </div>
+          <%# Vista previa decorativa del mapa con SVG estilizado %>
+          <div class="col-lg-7 reveal reveal-right">
+             <%- include('partials/svg_visuals', { tipo: 'embalses' }) %>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider"></div>
+    </div>
+
+    <%# FEATURE 02: Ríos  %>
+    <div class="feature-section fs-darker">
+      <div class="fs-bg-orb fs-orb-right"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row align-items-center g-5 flex-lg-row-reverse" style="min-height:70vh;">
+          <div class="col-lg-5 reveal reveal-right">
+            <div class="fs-label">02 — Red Fluvial</div>
+            <h2 class="fs-title">Monitoreo de <span class="gradient-text">Ríos Principales</span></h2>
+            <p class="fs-body">
+              Visualiza las métricas de las 6 grandes cuencas hidrográficas. Descubre información sobre la longitud, el caudal medio y las CCAA que atravisesan los principales ríos de la península.
+            </p>
+            <ul class="fs-features">
+              <li><span class="ff-dot" style="background:var(--accent-blue)"></span>Clasificación por vertientes</li>
+              <li><span class="ff-dot" style="background:var(--accent-cyan)"></span>Trazados cartográficos precisos</li>
+              <li><span class="ff-dot" style="background:var(--status-good)"></span>Información base y caudal</li>
+            </ul>
+            <button class="btn-feature" onclick="goToSection('rios')">
+              Ver Red de Ríos <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+            </button>
+          </div>
+          <%# Vista previa decorativa del mapa con SVG estilizado %>
+          <div class="col-lg-7 reveal reveal-left">
+            <%- include('partials/svg_visuals', { tipo: 'rios' }) %>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider flip"></div>
+    </div>
+
+    <%# FEATURE 03: Estadísticas  %>
+    <div class="feature-section fs-dark">
+      <div class="fs-bg-orb fs-orb-left"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row align-items-center g-5" style="min-height:70vh;">
+          <div class="col-lg-5 reveal reveal-left">
+            <div class="fs-label">03 — Estadísticas</div>
+            <h2 class="fs-title">Análisis nacional <span class="gradient-text">por cuenca</span></h2>
+            <p class="fs-body">
+              Dashboard analítico con gráficas por cuenca hidrográfica, ranking de embalses más y menos llenos y estado detallado por Comunidad Autónoma.
+            </p>
+            <ul class="fs-features">
+              <li><span class="ff-dot" style="background:var(--accent-cyan)"></span>Llenado por cuenca hidrográfica</li>
+              <li><span class="ff-dot" style="background:var(--status-good)"></span>Ranking Embalses por llenado</li>
+              <li><span class="ff-dot" style="background:var(--accent-blue)"></span>Distribución genereal de la red de embalses y estado por CCAA</li>
+            </ul>
+            <button class="btn-feature" onclick="goToSection('estadisticas')">
+              Ver Estadísticas <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+            </button>
+          </div>
+          <%# Vista previa decorativa del mapa con SVG estilizado %>
+          <div class="col-lg-7 reveal reveal-right">
+             <%- include('partials/svg_visuals', { tipo: 'estadisticas' }) %>
+          </div>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider"></div>
+    </div>
+
+    <%# FEATURE 04: AEMET  %>
+    <div class="feature-section fs-darker">
+      <div class="fs-bg-orb fs-orb-right"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row align-items-center g-5 flex-lg-row-reverse" style="min-height:70vh;">
+          <div class="col-lg-5 reveal reveal-right">
+            <div class="fs-label">04 — Sistema Climático</div>
+            <h2 class="fs-title">Integración Oficial <span class="gradient-text">AEMET</span></h2>
+            <p class="fs-body">
+              Busca tu municipio para buscar las predicciones meteorológicas semanal. Accede al mapa interactivo de observaciones térmicas provistos directamente por la Agencia Estatal de Meteorología.
+            </p>
+            <ul class="fs-features">
+              <li><span class="ff-dot" style="background:var(--accent-blue)"></span>Predicción semanal por municipio</li>
+              <li><span class="ff-dot" style="background:var(--status-good)"></span>Temperaturas de estaciones de observación</li>
+              <li><span class="ff-dot" style="background:var(--status-bad)"></span>Noticias actualizadas</li>
+            </ul>
+            <button class="btn-feature" onclick="goToSection('noticias')">
+              Acceder a Meteorología <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+            </button>
+          </div>
+          <%# Vista previa decorativa del mapa con SVG estilizado %>
+          <div class="col-lg-7 reveal reveal-left">
+            <%- include('partials/svg_visuals', { tipo: 'aemet' }) %>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider flip"></div>
+    </div>
+
+    <%# FEATURE 05: Mapas Temáticos %>
+    <div class="feature-section fs-dark">
+      <div class="fs-bg-orb fs-orb-left"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row align-items-center g-5" style="min-height:70vh;">
+          <div class="col-lg-5 reveal reveal-left">
+            <div class="fs-label">05 — Visualización Avanzada</div>
+            <h2 class="fs-title">Catálogo de <span class="gradient-text">Mapas Temáticos</span></h2>
+            <p class="fs-body">
+              Explora diferentes mapas tematicos. Desde mapas de calor para detectar el déficit hídrico (sequía), hasta análisis de símbolos proporcionales sobre usos hidroeléctricos.
+            </p>
+            <ul class="fs-features">
+              <li><span class="ff-dot" style="background:var(--accent-cyan)"></span>Estados de llenado por Cuenca</li>
+              <li><span class="ff-dot" style="background:var(--status-bad)"></span>Mapas de calor (Déficit y Sequía)</li>
+              <li><span class="ff-dot" style="background:var(--status-avg)"></span>Símbolos proporcionales de Uso</li>
+            </ul>
+            <button class="btn-feature" onclick="goToSection('mapas')">
+              Abrir Catálogo de Visores <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+            </button>
+          </div>
+          <%# Vista previa decorativa del mapa con SVG estilizado %>
+          <div class="col-lg-7 reveal reveal-right">
+            <%- include('partials/svg_visuals', { tipo: 'mapas' }) %>
+          </div>
+        </div>
+      </div>
+      <div class="section-divider"></div>
+    </div>
+
+    <%# CTA Final  %>
+    <div class="cta-section reveal">
+      <div class="cta-bg-anim"></div>
+      <div class="cta-content">
+        <div class="fs-label text-center">06 — Acceso Operativo</div>
+        <h2 class="cta-title">Monitorización hídrica<br><span class="gradient-text">de toda España</span></h2>
+        <p class="cta-body">Registrate en HidroVisor para acceder a todas las herramientas que ofrecemos. Explora las pestañas de Estadísticas, AEMET y Mapas Temáticos.</p>
+        <div class="cta-actions">
+          <button class="btn-primary-hero" data-bs-toggle="modal" data-bs-target="#authModal">
+            Iniciar Sesión <%- include('partials/svg_visuals', { tipo: 'icono-flecha' }) %>
+          </button>
+          <button class="btn-secondary-hero" onclick="goToSection('pantanos')">Explorar sin cuenta</button>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Footer ── %>
+    <footer class="site-footer">
+      <div class="footer-glow-line"></div>
+      <div class="container-fluid px-4 px-lg-5">
+        <div class="row g-5 footer-top">
+
+          <div class="col-lg-4 col-md-6">
+            <div class="footer-brand">
+              <img src="/images/logo.png" alt="HidroVisor" class="footer-logo">
+              <span class="footer-brand-name">Hidro<em>Visor</em></span>
+            </div>
+            <p class="footer-tagline">
+              Sistema nacional de monitorización hídrica en tiempo real. Datos oficiales del MITECO actualizados semanalmente.
+            </p>  
+          </div>
+
+          <div class="col-lg-2 col-md-3 col-6">
+            <h4 class="footer-heading">Plataforma</h4>
+            <ul class="footer-links">
+              <li><a href="#" onclick="goToSection('pantanos');return false;">Mapa de Embalses</a></li>
+              <li><a href="#" onclick="goToSection('rios');return false;">Ríos Principales</a></li>
+              <li><a href="#" onclick="goToSection('estadisticas');return false;">Estadísticas</a></li>
+              <li><a href="#" onclick="goToSection('noticias');return false;">Alertas AEMET</a></li>
+              <li><a href="#" onclick="goToSection('mapas');return false;">Mapas Temáticos</a></li>
+            </ul>
+          </div>
+
+          <div class="col-lg-2 col-md-3 col-6">
+            <h4 class="footer-heading">Fuentes</h4>
+            <ul class="footer-links">
+              <li><a href="https://www.miteco.gob.es" target="_blank" rel="noopener">MITECO</a></li>
+              <li><a href="https://www.aemet.es"      target="_blank" rel="noopener">AEMET</a></li>
+              <li><a href="https://www.chebro.es"     target="_blank" rel="noopener">CHE — Ebro</a></li>
+              <li><a href="https://www.chduero.es"    target="_blank" rel="noopener">CHD — Duero</a></li>
+              <li><a href="https://www.chj.es"        target="_blank" rel="noopener">CHJ — Júcar</a></li>
+            </ul>
+          </div>
+
+          <div class="col-lg-2 col-md-6">
+            <h4 class="footer-heading">Sistema</h4>
+            <ul class="footer-links">
+              <li><a href="#" data-bs-toggle="modal" data-bs-target="#authModal">Acceso a Usuarios</a></li>
+              <li><a href="#" data-bs-toggle="modal" data-bs-target="#helpModal">Guía de Uso</a></li>
+            </ul>
+            <div class="footer-status-badge mt-4">
+              <span class="fsb-dot"></span>
+              <div>
+                <div class="fsb-title">Estado del Servidor</div>
+                <div class="fsb-val">Operativo y En Línea</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="footer-bottom">
+          <div class="footer-bottom-left">
+            <span>© 2026 HidroVisor — Proyectos de aplicaciones de las tecnologías geoespaciales</span>
+          </div>
+          <div class="footer-bottom-right">
+            <span>Actualizado semanalmente</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 2: PANTANOS
+      Layout fijo: sidebar lateral + mapa Leaflet.
+      El dashboard de detalle aparece debajo del mapa
+      al hacer clic en un marcador (showDetail en ui.js).
+  ══════════════════════════════════════════════════ %>
+  <section id="secPantanos" class="section-page">
+    <div class="app-container d-flex" style="height:100%;">
+
+      <%# Sidebar: explorador con pestañas CCAA / Embalses / Ríos %>
+      <aside class="sidebar d-flex flex-column" id="appSidebar">
+        <div class="sb-hd">
+          <span class="sb-title">🗺️ Explorador</span>
+          <button class="btn-close btn-close-white d-md-none" style="opacity:0.4;" onclick="toggleSidebar()"></button>
+        </div>
+        <div class="px-3 py-2 border-bottom" style="border-color:rgba(255,255,255,0.04)!important;">
+          <input type="text" class="search-input" id="searchInput"
+            placeholder="Buscar región o embalse..."
+            oninput="onSearch(this.value)" autocomplete="off">
+        </div>
+        <div class="sb-tabs">
+          <button class="stab active" id="stab1" onclick="setTab('regions')">CCAA</button>
+          <button class="stab"        id="stab2" onclick="setTab('embalses')">Embalses</button>
+          <button class="stab"        id="stab3" onclick="setTab('rios')">Ríos</button>
+        </div>
+        <%# Lista dinámica generada por buildSidebar() en ui.js %>
+        <div class="sb-body overflow-auto flex-grow-1" id="sbBody"></div>
+      </aside>
+
+      <main class="main-content d-flex flex-column h-100 w-100 overflow-hidden" id="mainContent">
+
+        <%# Contenedor del mapa con leyenda, control de radar y ticker %>
+        <div class="map-wrapper d-flex flex-column position-relative flex-grow-1" id="mapWrapper">
+
+          <%# Leyenda de estados de llenado %>
+          <div class="msbar">
+            <div class="legend-pill"><div class="legend-dot" style="background:var(--status-good);box-shadow:0 0 7px var(--status-good)"></div>Óptimo <span style="color:#1e3a52;margin-left:3px">&gt;70%</span></div>
+            <div class="legend-pill"><div class="legend-dot" style="background:var(--status-avg);box-shadow:0 0 7px var(--status-avg)"></div>Precaución <span style="color:#1e3a52;margin-left:3px">40–70%</span></div>
+            <div class="legend-pill"><div class="legend-dot" style="background:var(--status-bad);box-shadow:0 0 7px var(--status-bad)"></div>Crítico <span style="color:#1e3a52;margin-left:3px">&lt;40%</span></div>
+          </div>
+
+          <%# Control del radar de precipitaciones — toggleRadar() en map.js %>
+          <div id="radarControl" class="radar-control">
+            <button id="btnRadar" class="btn btn-sm btn-dark border border-info text-info fw-bold d-flex align-items-center gap-2" onclick="toggleRadar()">
+              <span>🌧️</span>
+              <span class="d-none d-sm-inline">Precipitaciones</span>
+              <span class="d-inline d-sm-none">Radar</span>
+            </button>
+            <div id="radarTimeContainer" class="d-none align-items-center gap-2">
+              <span class="badge d-none d-sm-inline" style="background:var(--grad-primary);color:#020d1a;font-family:var(--font-display);font-size:.62rem;letter-spacing:1.5px;">EN VIVO</span>
+              <span id="radarTime" style="font-family:var(--font-data);font-size:1rem;color:#e0f4ff;letter-spacing:1px;font-weight:700;">--:--</span>
+            </div>
+          </div>
+
+          <%# Contenedor principal del mapa Leaflet (inicializado en initMap()) %>
+          <div id="map" class="flex-grow-1 w-100" style="z-index:1;"></div>
+
+          <%# Ticker de noticias AEMET en la parte inferior del mapa %>
+          <div class="news-ticker d-flex align-items-center w-100 position-absolute bottom-0" id="newsTicker" style="z-index:500;">
+            <div class="ticker-label">AEMET Directo</div>
+            <div class="ticker-wrap">
+              <div class="ticker-text" id="tickerText">Cargando alertas...</div>
+            </div>
+          </div>
+        </div>
+
+        <%# Dashboard de detalle — se muestra/oculta con showDetail()/closeDashboard() en ui.js %>
+        <div class="dashboard-wrapper w-100 d-none" id="dashboard">
+          <div class="d-flex justify-content-between align-items-start mb-4">
+            <div class="d-flex align-items-center gap-3">
+              <div class="d-ico d-flex align-items-center justify-content-center" id="dIcon" style="font-size:1.3rem;">💧</div>
+              <div>
+                <h2 class="fw-bold m-0" id="dName" style="font-family:var(--font-display);font-size:1.25rem;color:#e8f4ff;letter-spacing:-0.5px;">Seleccionado</h2>
+                <div class="mt-1 d-flex flex-wrap align-items-center gap-2">
+                  <span id="dSub" style="font-size:.92rem;color:#4a6a88;"></span>
+                  <span id="dSource" class="dash-source-badge">Fuente</span>
+                </div>
+              </div>
+            </div>
+            <button class="btn-close-dash" onclick="closeDashboard()">✕ <span class="d-none d-sm-inline">Cerrar</span></button>
+          </div>
+          <%# Estadísticas del embalse/río seleccionado (inyectadas por ui.js) %>
+          <div class="row g-3 mb-4" id="statsRow"></div>
+          <div class="row g-3">
+            <div class="col-md-8">
+              <div class="bg-dark p-3 rounded h-100 d-flex flex-column">
+                <h5 class="chart-label" id="chart1Title">Evolución Anual</h5>
+                <div style="height:170px;width:100%;position:relative;flex:1;"><canvas id="chartLine"></canvas></div>
+              </div>
+            </div>
+            <div class="col-md-4" id="chartDonutContainer">
+              <div class="bg-dark p-3 rounded h-100 d-flex flex-column">
+                <h5 class="chart-label">Distribución</h5>
+                <div style="height:170px;width:100%;position:relative;flex:1;"><canvas id="chartDonut"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 3: RÍOS
+      Cards generadas dinámicamente por renderRios() en ui.js.
+  ══════════════════════════════════════════════════ %>
+  <section id="secRios" class="section-page">
+    <div class="content-page px-4 py-5">
+      <div class="cp-header reveal">
+        <h2 class="cp-title">Ríos de España</h2>
+        <p class="cp-sub">Grandes cuencas hidrográficas · Datos de caudal, longitud y vertiente</p>
+        <div class="mt-4 p-3 rounded d-flex align-items-start gap-3" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3);">
+          <div style="font-size: 1.25rem; line-height: 1;">⚠️</div>
+          <div>
+            <h6 class="fw-bold mb-1" style="color: #f59e0b; font-family: var(--font-display); letter-spacing: 0.5px;">AVISO</h6>
+            <p class="mb-0 text-white-50" style="font-size: 0.9rem; line-height: 1.5;">
+              Los datos de caudal mostrados en esta sección son <strong>SIMULADOS</strong> mediante funciones sinusoidales para emular el ciclo hídrico anual. No corresponden a datos reales históricos.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="row g-4" id="riosGrid"></div>
+    </div>
+  </section>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 4: ESTADÍSTICAS
+      Dashboard analítico nacional.
+      TODO el contenido se genera dinámicamente
+      por renderEstadisticas() en ui.js.
+  ══════════════════════════════════════════════════ %>
+  <section id="secEstadisticas" class="section-page">
+    <div class="content-page px-4 py-5">
+
+      <div class="cp-header reveal">
+        <h2 class="cp-title">Estadísticas</h2>
+        <p class="cp-sub">Estado hídrico nacional · Fuente: MITECO</p>
+      </div>
+
+      <%# KPIs nacionales — rellenados por renderEstadisticas() con textos explicativos %>
+      <div class="row g-3 mb-4" id="statsKpis"></div>
+
+      <%# Fila principal: gráfico + distribución (izq) y rankings (der) %>
+      <div class="row g-4">
+
+        <%# COLUMNA IZQUIERDA: gráfico de cuencas + distribución de estados %>
+        <div class="col-lg-7 reveal reveal-left">
+
+          <%# Gráfico de barras horizontales por cuenca hidrográfica %>
+          <div class="stat-card glow-card mb-4">
+            <h5 class="stat-card-title">Llenado por Cuenca Hidrográfica</h5>
+            <div style="height:500px;position:relative;">
+              <canvas id="chartCuencas"></canvas>
+            </div>
+          </div>
+
+          <%# Distribución de estados + cuencas extremas
+              Rellenado por renderEstadisticas() con barras de progreso
+              y las cuencas más llena/vacía de la red nacional %>
+          <div class="stat-card">
+            <h5 class="stat-card-title mb-3">Distribución General de la Red</h5>
+            <div id="distribucionEstados"></div>
+          </div>
+
+        </div>
+
+        <%# COLUMNA DERECHA: rankings top 5 %>
+        <div class="col-lg-5 reveal reveal-right">
+          <div class="stat-card h-100">
+            <h5 class="stat-card-title">Los 5 embalses más llenos</h5>
+            <div id="rankingTop" class="ranking-list"></div>
+            <h5 class="stat-card-title mt-4">Los 5 embalses más vacíos</h5>
+            <div id="rankingBottom" class="ranking-list"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <%# Tabla de estado por Comunidad Autónoma (ancho completo) %>
+      <div class="row g-4 mt-3">
+        <div class="col-12">
+          <div class="stat-card">
+            <h5 class="stat-card-title">Estado por Comunidad Autónoma</h5>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>Comunidad</th>
+                    <th class="text-end">Embalses</th>
+                    <th class="text-end">Capacidad (hm³)</th>
+                    <th class="text-end">Almacenado (hm³)</th>
+                    <th>Llenado</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaCCAA"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 5: TIEMPO & NOTICIAS AEMET
+      Tres bloques verticales:
+        1. Buscador municipio → predicción 7 días
+        2. Mapa de temperaturas de estaciones (Leaflet)
+        3. Grid de noticias del RSS de AEMET
+      La lógica está en tiempo.js.
+  ══════════════════════════════════════════════════ %>
+  <section id="secNoticias" class="section-page">
+    <div class="content-page px-4 py-5">
+      <div class="cp-header reveal">
+        <h2 class="cp-title">Información Meteorológica AEMET</h2>
+        <p class="cp-sub">Predicción meteorológica y últimas noticias oficiales</p>
+      </div>
+
+      <%# Buscador jerárquico: CCAA → Provincia → Municipio %>
+      <div class="tiempo-buscador mb-4 reveal p-4 rounded" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);">
+        <h5 class="text-white mb-3" style="font-family:var(--font-display);">🔍 Consultar predicción por municipio</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label text-info small fw-bold text-uppercase">Comunidad Autónoma</label>
+            <select id="selCCAA" class="form-select bg-dark text-white border-secondary shadow-none" onchange="tiempoSelectCCAA()">
+              <option value="">— Selecciona CCAA —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label text-info small fw-bold text-uppercase">Provincia</label>
+            <select id="selProvincia" class="form-select bg-dark text-white border-secondary shadow-none" onchange="tiempoSelectProv()" disabled>
+              <option value="">— Primero elige CCAA —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label text-info small fw-bold text-uppercase">Municipio</label>
+            <select id="selMunicipio" class="form-select bg-dark text-white border-secondary shadow-none" onchange="tiempoSelectMun()" disabled>
+              <option value="">— Primero elige provincia —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <%# Panel de predicción — oculto hasta que se selecciona municipio %>
+      <div id="prediccionPanel" class="mb-5 reveal p-4 rounded" style="display:none;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);">
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+          <h4 class="m-0 text-white fw-bold" id="predMunicipio">—</h4>
+          <span class="text-white-50 small" id="predElaboracion"></span>
+        </div>
+        <%# Cards de días generadas por _renderPrediccion() en tiempo.js %>
+        <div class="d-flex overflow-auto gap-3 pb-2" id="predDias"></div>
+      </div>
+
+      <%# Mapa de temperaturas actuales en capitales de provincia %>
+      <div class="cp-header mb-4 reveal" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:24px;">
+        <h5 class="text-white" style="font-family:var(--font-display);">🌡️ Temperaturas en Tiempo Real</h5>
+        <p class="cp-sub mb-0" id="obsActualizacion" style="font-size:0.85rem;">Cargando observaciones...</p>
+      </div>
+      <div class="mb-5 reveal" style="height:450px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);">
+        <div id="mapaObservaciones" style="width:100%;height:100%;background-color:#1a1a1a;"></div>
+      </div>
+
+      <%# Grid de noticias AEMET — rellenado por renderNoticias() en ui.js %>
+      <div class="cp-header mb-4 reveal" style="border-top:1px solid rgba(255,255,255,0.06);padding-top:24px;">
+        <h5 class="text-white" style="font-family:var(--font-display);">📰 Últimas noticias AEMET</h5>
+      </div>
+      <div class="row g-4 reveal" id="noticiasGrid">
+        <div class="col-12 text-center py-5">
+          <div class="spinner-border mb-3" role="status" style="color:var(--accent-cyan);width:2rem;height:2rem;border-width:2px;"></div>
+          <p style="color:#2a4560;font-family:var(--font-display);font-size:.72rem;letter-spacing:2.5px;text-transform:uppercase;">Cargando noticias...</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%# ══════════════════════════════════════════════════
+      SECCIÓN 6: MAPAS TEMÁTICOS
+      Catálogo de visores: cuencas, y usos.
+      Al hacer clic en una card se abre el visor
+      con el mapa Leaflet correspondiente (abrirVisor() en ui.js).
+  ══════════════════════════════════════════════════ %>
+  <section id="secMapas" class="section-page">
+    <div class="content-page px-4 py-5">
+      <div class="cp-header reveal">
+        <h2 class="cp-title">Catálogo de Visores Temáticos</h2>
+        <p class="cp-sub">Explora la galería de mapas geoespaciales interactivos</p>
+      </div>
+
+      <%# Catálogo de cards — Ajustado a col-lg-3 para albergar las 4 tarjetas en una fila %>
+      <div id="catalogoVisores" class="row g-4 mb-4 reveal">
+
+        <%# Visor 1: Coroplético de cuencas hidrográficas (ACTIVO) %>
+        <div class="col-md-6 col-lg-3">
+          <div class="card bg-dark border-secondary h-100 shadow-sm text-center visor-card"
+            onclick="abrirVisor('cuencas')"
+            onmouseover="this.style.borderColor='var(--accent-cyan)';this.style.transform='translateY(-5px)';"
+            onmouseout="this.style.borderColor='var(--bs-border-color)';this.style.transform='translateY(0)';">
+            <div class="card-body p-4 d-flex flex-column">
+              <div class="display-4 mb-3">💧</div>
+              <h5 class="card-title text-white fw-bold mb-3">Estado de Cuencas</h5>
+              <p class="card-text text-white-50 small flex-grow-1">Mapa interactivo de coropletas que muestra el nivel medio de llenado por cada cuenca hidrográfica en tiempo real.</p>
+              <button class="btn btn-outline-info w-100 mt-3 rounded-pill fw-bold">Abrir Visor</button>
+            </div>
+          </div>
+        </div>
+
+         <%# Visor 2: Símbolos proporcionales de usos energéticos (ACTIVO) %>
+        <div class="col-md-6 col-lg-3">
+          <div class="card bg-dark border-secondary h-100 shadow-sm text-center visor-card"
+            onclick="abrirVisor('usos')"
+            onmouseover="this.style.borderColor='var(--accent-cyan)';this.style.transform='translateY(-5px)';"
+            onmouseout="this.style.borderColor='var(--bs-border-color)';this.style.transform='translateY(0)';">
+            <div class="card-body p-4 d-flex flex-column">
+              <div class="display-4 mb-3">⚡</div>
+              <h5 class="card-title text-white fw-bold mb-3">Explotación Hídrica</h5>
+              <p class="card-text text-white-50 small flex-grow-1">Mapa de símbolos proporcionales. Clasifica y compara la capacidad de los embalses hidroeléctricos frente a los de consumo.</p>
+              <button class="btn btn-outline-info w-100 mt-3 rounded-pill fw-bold">Abrir Visor</button>
+            </div>
+          </div>
+        </div>
+
+        <%# Visor 3: Mapa de calor de déficit hídrico (PRÓXIMAMENTE) %>
+        <div class="col-md-6 col-lg-3" style="opacity: 0.55;">
+          <div class="card bg-dark border-secondary h-100 shadow-sm text-center" style="border-style: dashed !important;">
+            <div class="card-body p-4 d-flex flex-column position-relative">
+              <span class="badge bg-secondary position-absolute top-0 start-50 translate-middle-x mt-3" style="font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 1px;">PRÓXIMAMENTE</span>
+              
+              <div class="display-4 mb-3 mt-2">🔥</div>
+              <h5 class="card-title text-white-50 fw-bold mb-3">Déficit Hídrico</h5>
+              <p class="card-text text-white-50 small flex-grow-1">Mapa de calor (Heatmap) que revelará el impacto severo de la sequía resaltando las zonas con mayor estrés hídrico acumulado.</p>
+              <button class="btn btn-dark w-100 mt-3 rounded-pill fw-bold" disabled style="border-color: rgba(255,255,255,0.05); color: rgba(255,255,255,0.2);">No Disponible</button>
+            </div>
+          </div>
+        </div>
+
+        <%# Visor 4: Humedad del Suelo por Satélite (PRÓXIMAMENTE) %>
+        <div class="col-md-6 col-lg-3" style="opacity: 0.55;">
+          <div class="card bg-dark border-secondary h-100 shadow-sm text-center" style="border-style: dashed !important;">
+            <div class="card-body p-4 d-flex flex-column position-relative">
+              <span class="badge bg-secondary position-absolute top-0 start-50 translate-middle-x mt-3" style="font-family: var(--font-display); font-size: 0.65rem; letter-spacing: 1px;">PRÓXIMAMENTE</span>
+              
+              <div class="display-4 mb-3 mt-2">🛰️</div>
+              <h5 class="card-title text-white-50 fw-bold mb-3">Humedad de Suelo</h5>
+              <p class="card-text text-white-50 small flex-grow-1">Integración de datos radar satelitales (Capa Copernicus/ESA) para evaluar el índice de humedad superficial del terreno agrícola.</p>
+              <button class="btn btn-dark w-100 mt-3 rounded-pill fw-bold" disabled style="border-color: rgba(255,255,255,0.05); color: rgba(255,255,255,0.2);">No Disponible</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <%# Visor activo — visible cuando se abre un mapa temático %>
+      <div id="visorActivo" class="d-none reveal">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
+          <button class="btn btn-outline-light btn-sm fw-bold px-3 rounded-pill border-2" onclick="cerrarVisor()">
+            ← Volver al catálogo
+          </button>
+          <h5 class="text-info m-0 fw-bold" id="tituloVisorActivo">Visor</h5>
+        </div>
+        <div class="mapa-tematico-wrapper" style="border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:4px;background:rgba(0,0,0,0.2);">
+          <%# Contenedor del mapa Leaflet temático — inicializado en renderMapaCuencas() %>
+          <div id="mapaTematico" style="height:520px;border-radius:8px;overflow:hidden;background:#1a1a1a;"></div>
+          <div class="mt-legend d-flex flex-wrap gap-3 mt-3 px-2 text-white small" id="mtLegend"></div>
+        </div>
+        <div class="mt-info-panel mt-4" id="mtInfoPanel">
+          <p class="text-white-50 text-center small">Haz clic en una cuenca para ver sus detalles</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%# Notificaciones toast (emergentes) (esquina inferior derecha) — controladas por showNotif() en ui.js %>
+  <div class="notif hide" id="notif"></div>
+
+  <%# ══════════════════════════════════════════════════
+      NAVBAR MÓVIL — Barra inferior de 6 botones
+      Solo visible en pantallas pequeñas (d-md-none).
+      Espeja la navegación del header de escritorio.
+  ══════════════════════════════════════════════════ %>
+  <nav class="mobile-bottom-nav d-flex d-md-none">
+    <button onclick="goToSection('inicio')"       class="mbn-btn active" id="mbnInicio">      <span class="mbn-ico">🏠</span><span>Inicio</span></button>
+    <button onclick="goToSection('pantanos')"     class="mbn-btn"        id="mbnPantanos">    <span class="mbn-ico">💧</span><span>Embalses</span></button>
+    <button onclick="goToSection('rios')"         class="mbn-btn"        id="mbnRios">        <span class="mbn-ico">🌊</span><span>Ríos</span></button>
+    
+    <button onclick="goToSection('estadisticas')" class="mbn-btn auth-locked" id="mbnEstadisticas"><span class="mbn-ico">📊</span><span>Estadística</span></button>
+    <button onclick="goToSection('noticias')" class="mbn-btn auth-locked" id="mbnNoticias"><span class="mbn-ico">🌤️</span><span>Alertas</span></button>
+    <button onclick="goToSection('mapas')" class="mbn-btn auth-locked" id="mbnMapas"><span class="mbn-ico">🗺️</span><span>Mapas</span></button>
+  </nav>
+
+  <%# ══════════════════════════════════════════════════
+      MODAL: AYUDA (GUÍA RÁPIDA)
+  ══════════════════════════════════════════════════ %>
+  <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background: var(--bg-panel); border: 1px solid rgba(0, 200, 240, 0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+        
+        <div class="modal-header border-bottom border-secondary">
+          <h5 class="modal-title fw-bold text-white" style="font-family: var(--font-display);">Guía Rápida | HidroVisor</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" style="opacity:.5;"></button>
+        </div>
+        
+        <div class="modal-body p-4">
+          <p style="font-size:1.05rem; color:#a8c0d8; margin-bottom:24px; line-height:1.6;">
+            <strong>HidroVisor</strong> monitoriza en tiempo real el estado hídrico de España con datos oficiales (MITECO y AEMET). Muévete por las pestañas superiores para cambiar de sección:
+          </p>
+
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="help-block mb-3">
+                <h6 class="text-white fw-bold mb-1">🏠 Inicio</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-info">El pulso del agua:</strong> Indicadores clave (KPIs) globales y tendencias de la reserva hidráulica a primer golpe de vista.</p>
+              </div>
+
+              <div class="help-block mb-3">
+                <h6 class="text-white fw-bold mb-1">💧 Embalses</h6>
+                <p class="text-white-50 small mb-2"><strong class="text-info">Mapa interactivo:</strong> Embalses agrupados en clústeres. Haz clic en cualquiera para abrir sus gráficas y datos evolutivos.</p>
+                <p class="text-white-50 small mb-0"><strong class="text-info">Buscador lateral:</strong> Filtra al instante por Comunidad Autónoma, Cuenca o estado de llenado con zoom automático.</p>
+              </div>
+
+              <div class="help-block mb-3">
+                <h6 class="text-white fw-bold mb-1">🌊 Ríos</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-info">Caudal en vivo:</strong> Mapa con el trazado real de la red fluvial y tarjetas visuales para medir la salud de nuestros ríos por vertientes.</p>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="help-block mb-3">
+                <h6 class="text-white fw-bold mb-1">📊 Estadísticas</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-info">Analítica pura:</strong> Gráficos avanzados, rankings de almacenamiento y comparativas de estrés hídrico por regiones.</p>
+              </div>
+
+              <div class="help-block mb-3">
+                <h6 class="text-white fw-bold mb-1">🌤️ AEMET</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-info">Radar y tiempo:</strong> Animación de lluvia en tiempo real, mapas meteorológicos y buscador de predicción por municipio.</p>
+              </div>
+
+              <div class="help-block mb-4">
+                <h6 class="text-white fw-bold mb-1">🗺️ Mapas Temáticos</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-info">Capas avanzadas:</strong> Mapas de coropletas y visores especializados según el uso del agua (consumo, regadío o hidroeléctrico).</p>
+              </div>
+
+              <div class="help-block mb-0 p-3 rounded" style="background: rgba(0,200,240,0.05); border: 1px solid rgba(0,200,240,0.2);">
+                <h6 class="text-info fw-bold mb-1">🔐 Acceder</h6>
+                <p class="text-white-50 small mb-0"><strong class="text-white">Inicio de sesión:</strong> Haz clic en el botón Acceder para obtener más información exclusiva y ser parte del proyecto.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Modal de login/registro (extraído a partial para mantener este archivo limpio) %>
+  <%- include('partials/auth-modal') %>
+
+  <%# ══════════════════════════════════════════════════
+      SCRIPTS
+      Orden importante: primero librerías externas,
+      luego módulos propios de menor a mayor dependencia.
+      config.js → map.js → tiempo.js → ui.js → auth.js
+  ══════════════════════════════════════════════════ %>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <script src="/javascripts/config.js"></script>
+  <script src="/javascripts/map.js"></script>
+  <script src="/javascripts/tiempo.js"></script>
+  <script src="/javascripts/ui.js"></script>
+  <script src="/javascripts/auth.js"></script>
+
+ <script>
+    /* ══════════════════════════════════════════════════════════════
+        SCRIPTS INLINE — Comportamientos globales de la página
+        Separados aquí para no contaminar los módulos JS.
+     ══════════════════════════════════════════════════════════════ */
+
+    /* 1. HEADER DINÁMICO EN SCROLL
+       El header empieza transparente y se vuelve sólido al bajar.
+       Solo funciona en la sección de Inicio porque las demás no hacen scroll. */
+    const appHeader = document.getElementById('appHeader');
+    const secInicio = document.getElementById('secInicio');
+
+    function updateHeaderOnScroll() {
+      appHeader.classList.toggle('header-solid', (secInicio.scrollTop || 0) > 60);
+    }
+    secInicio.addEventListener('scroll', updateHeaderOnScroll, { passive: true });
+
+    /* 2. WRAPPER DE goToSection
+       Interceptamos la función original para añadir tres efectos:
+       - Control de acceso (Auth-wall) para bloquear secciones premium si no hay sesión
+       - Solidificar el header al salir de Inicio
+       - Lanzar el motor de animaciones reveal en la nueva sección */
+    const _origGoTo = window.goToSection;
+    window.goToSection = function(name) {
+      
+      // Definimos los nombres de las pestañas que queremos proteger
+      const rutasProtegidas = ['estadisticas', 'noticias', 'mapas'];
+      
+      // Si el usuario intenta entrar a una sección protegida y NO ha iniciado sesión...
+      if (rutasProtegidas.includes(name) && window.HV_Auth && !window.HV_Auth.isLogged()) {
+        window.doLogin(); // Abrimos el modal de login de forma automática
+        
+        // Colocamos el texto de aviso en la caja de mensajes del modal
+        const msgBox = document.getElementById('authMsg');
+        if (msgBox) {
+          msgBox.textContent = 'Inicia sesión para acceder a las funciones avanzadas.';
+          msgBox.className = 'auth-msg show error';
+        }
+        return; // Cortamos la ejecución aquí para impedir que se cambie de pestaña
+      }
+
+      // Si está logueado o la sección es pública, continúa la navegación normal
+      if (typeof _origGoTo === 'function') _origGoTo(name);
+      appHeader.classList.toggle('header-solid', name !== 'inicio');
+      if (name === 'inicio') setTimeout(updateHeaderOnScroll, 50);
+      setTimeout(initReveal, 80);
+    };
+
+    /* 3. MOTOR DE ANIMACIONES REVEAL (fade-in al scroll)
+       IntersectionObserver detecta cuándo cada elemento .reveal
+       entra en el viewport y le añade la clase .revealed. */
+    const revealObs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('revealed');
+          revealObs.unobserve(e.target); // solo se anima una vez
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+    function initReveal() {
+      document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(el => {
+        if (!el.classList.contains('revealed')) revealObs.observe(el);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', initReveal);
+
+    /* 4. ANIMACIÓN DE CONTADORES (efecto "ruleta" de números)
+       Se usa para los KPIs del hero y la marquesina. */
+    function animateCount(el, target, suffix, dur) {
+      const isFloat = String(target).includes('.');
+      const t0 = performance.now();
+      (function step(now) {
+        const p = Math.min((now - t0) / dur, 1);
+        const e = 1 - Math.pow(1 - p, 3); // ease-out cúbico
+        el.textContent = (isFloat ? (target * e).toFixed(1) : Math.floor(target * e)) + (suffix || '');
+        if (p < 1) requestAnimationFrame(step);
+      })(t0);
+    }
+
+    /* Espera a que renderLanding esté disponible para poder envolverla.
+       Es necesario porque ui.js puede tardar un momento en declarar la función. */
+    const probe = setInterval(() => {
+      if (typeof renderLanding === 'function') {
+        clearInterval(probe);
+        const orig = renderLanding;
+        window.renderLanding = function() {
+          orig();
+          setTimeout(window._runLandingCounters, 300);
+        };
+      }
+    }, 100);
+  </script>
+
+</body>
+</html>

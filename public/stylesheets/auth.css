@@ -1,0 +1,586 @@
+/* =============================================================
+   auth.css — Sistema de autenticación y estado de usuario
+   HidroVisor v3.x
+
+   Orden de carga: Bootstrap → Leaflet → style-v32.css →
+                   style.css → auth.css  ← este archivo
+
+   Al cargar último, este archivo tiene la mayor precedencia
+   del proyecto. Úsalo con cuidado: los estilos que pongas
+   aquí siempre ganarán. No metas cosas que no sean de auth.
+
+   Contenido:
+     1. Modal de autenticación (contenedor, glow, layout)
+     2. Branding dentro del modal
+     3. Tabs Login / Registro
+     4. Mensajes de feedback (error / éxito)
+     5. Formularios y campos
+     6. Botón de envío con estado de carga
+     7. Pie del modal
+     8. Estado de usuario en la navbar (post-login)
+     9. Dropdown del menú de usuario
+    10. Botón de favorito en tarjetas de embalse
+    11. Responsive del modal
+   =============================================================
+
+   NOTAS DE MANTENIMIENTO:
+   - Los estilos BASE de .user-menu y .user-info están en
+     style.css (estado anónimo). Este archivo los extiende
+     para el estado autenticado (.user-menu.logged, etc.).
+   - El dropdown usa opacity+visibility en lugar de
+     display:none/block porque Bootstrap fuerza display:none
+     en .dropdown-menu con alta especificidad. Si en algún
+     momento dejas de usar la clase .dropdown-menu de Bootstrap
+     en el HTML, puedes quitar los !important de abajo.
+   - Si añades nuevas pantallas al modal (recuperar contraseña,
+     verificar email, etc.), crea nuevas clases .auth-* aquí
+     y no toques las existentes.
+   ============================================================= */
+
+
+/* 1. FONDO Y CONTENEDOR DEL MODAL 
+
+   El backdrop se oscurece más que el 0.5 por defecto de Bootstrap
+   porque el mapa de fondo ya es oscuro y 0.5 queda poco definido.
+   Con 0.78 el modal destaca bien sin parecer demasiado bloqueante. */
+
+.modal-backdrop.show {
+  opacity: 0.78 !important; /* Bootstrap usa !important también, necesitamos igualarlo */
+}
+
+.auth-modal-content {
+  background: linear-gradient(155deg, #0a1a2f 0%, #04101f 100%);
+  border: 1px solid rgba(0, 200, 240, 0.18);
+  border-radius: 16px;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 200, 240, 0.05),       /* halo exterior muy sutil */
+    inset 0 1px 0 rgba(255, 255, 255, 0.03); /* borde superior interior */
+  overflow: hidden;
+  position: relative;
+}
+
+/* Halo de luz en la parte superior del modal.
+   El pseudo-elemento está por debajo del contenido (pointer-events:none)
+   y crea la ilusión de que la luz viene de arriba, desde el logo. */
+.auth-modal-content::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  height: 240px;
+  background: radial-gradient(ellipse, rgba(0, 200, 240, 0.35), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Botón de cerrar — esquina superior derecha */
+.auth-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #8fb4d0;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 2; /* por encima del halo ::before */
+}
+.auth-close:hover {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.3);
+  color: #f43f5e;
+}
+
+.auth-modal-body {
+  padding: 40px 36px 28px;
+  position: relative;
+  z-index: 1; /* por encima del halo decorativo */
+}
+
+
+/* 2. BRANDING DENTRO DEL MODAL
+
+   Mismo sistema visual que el logo del header (logo-tx + tagline)
+   pero adaptado al contexto del modal. Si cambias el logo del
+   header, probablemente quieras cambiar este también. */
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.auth-brand-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  box-shadow: 0 4px 20px rgba(0, 200, 240, 0.25);
+}
+
+.auth-brand-text {
+  text-align: left;
+}
+
+.auth-brand-title {
+  display: block;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #e8f4ff;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+/* "Visor" en acento — igual que .logo-tx span en style.css */
+.auth-brand-title em {
+  color: #00c8f0;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.auth-brand-sub {
+  display: block;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 0.64rem;
+  color: #4a6a88;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+
+/* 3. TABS LOGIN / REGISTRO 
+
+   Sistema de dos tabs con una pastilla deslizante por debajo.
+   La pastilla es un elemento absoluto que se mueve con transform,
+   más suave que animar left/right. El JS solo necesita cambiar
+   el atributo data-active="login" / data-active="signup". */
+
+.auth-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.auth-tab {
+  background: transparent;
+  border: none;
+  color: #6a8aa5;
+  padding: 10px 14px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  position: relative;
+  z-index: 1; /* encima de .auth-tab-indicator */
+  transition: color 0.25s;
+  border-radius: 8px;
+}
+.auth-tab:hover { color: #8fb4d0; }
+
+/* Texto oscuro cuando la pastilla está debajo (fondo claro) */
+.auth-tab.active { color: #020d1a; }
+
+/* La pastilla deslizante — no se mueve con JS, se controla
+   solo con CSS a través del atributo data-active del padre */
+.auth-tab-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: linear-gradient(135deg, #00c8f0, #1a6cff);
+  border-radius: 8px;
+  transition: transform 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+  box-shadow: 0 2px 12px rgba(0, 200, 240, 0.4);
+  z-index: 0;
+}
+.auth-tabs[data-active="signup"] .auth-tab-indicator {
+  transform: translateX(100%);
+}
+
+
+/* 4. MENSAJES DE FEEDBACK 
+
+   Ocultos por defecto. El JS añade .show cuando hay error o éxito.
+   La animación de entrada evita el salto brusco al aparecer.
+   No usar display:none directamente porque la animación no funciona. */
+
+.auth-msg {
+  display: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  margin-bottom: 18px;
+  text-align: center;
+  animation: authMsgIn 0.25s ease;
+}
+.auth-msg.show   { display: block; }
+.auth-msg.error  {
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #ffb3c1;
+}
+.auth-msg.success {
+  background: rgba(0, 229, 163, 0.1);
+  border: 1px solid rgba(0, 229, 163, 0.35);
+  color: #a7f3d0;
+}
+
+@keyframes authMsgIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* 5. FORMULARIOS 
+
+   La animación de entrada se aplica al formulario completo cuando
+   se cambia de tab, dando la sensación de que el contenido se renueva. */
+
+.auth-form {
+  animation: authFormIn 0.3s ease;
+}
+@keyframes authFormIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.auth-field {
+  margin-bottom: 16px;
+}
+
+.auth-field label {
+  display: block;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 0.7rem;
+  color: #8fb4d0;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+
+.auth-field input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 200, 240, 0.12);
+  border-radius: 10px;
+  padding: 13px 16px;
+  color: #e8f4ff;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.auth-field input::placeholder { color: #3a5a76; }
+.auth-field input:focus {
+  outline: none;
+  background: rgba(0, 0, 0, 0.55);
+  border-color: #00c8f0;
+  box-shadow: 0 0 0 3px rgba(0, 200, 240, 0.15);
+}
+.auth-field input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* 6. BOTÓN DE ENVÍO 
+
+   Dos estados visuales: normal y loading.
+   En loading, el texto se atenúa y aparece el spinner inline.
+   El overflow:hidden está para contener cualquier efecto ripple
+   que se quiera añadir en el futuro. */
+
+.auth-submit-btn {
+  position: relative;
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #00c8f0, #1a6cff);
+  color: #020d1a;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  overflow: hidden;
+}
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 200, 240, 0.35);
+}
+.auth-submit-btn:active:not(:disabled) { transform: translateY(0); }
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-submit-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(2, 13, 26, 0.3);
+  border-top-color: #020d1a;
+  border-radius: 50%;
+  margin-left: 10px;
+  animation: authSpin 0.7s linear infinite;
+  vertical-align: middle;
+}
+.auth-submit-btn.loading .auth-submit-text    { opacity: 0.6; }
+.auth-submit-btn.loading .auth-submit-spinner { display: inline-block; }
+
+@keyframes authSpin { to { transform: rotate(360deg); } }
+
+
+/* 7. PIE DEL MODAL 
+
+   Enlace para cambiar entre Login y Registro, y aviso de privacidad.
+   El separador de privacidad usa border-top en lugar de un <hr>
+   para evitar que Bootstrap le aplique sus estilos de tabla. */
+
+.auth-switch-hint {
+  text-align: center;
+  margin: 18px 0 0;
+  color: #6a8aa5;
+  font-size: 0.88rem;
+}
+.auth-switch-link {
+  color: #00c8f0;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.auth-switch-link:hover {
+  color: #66d9ff;
+  text-decoration: underline;
+}
+
+.auth-privacy {
+  margin: 26px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.72rem;
+  color: #4a6a88;
+  text-align: center;
+  line-height: 1.5;
+}
+
+
+/* 8. ESTADO DE USUARIO EN LA NAVBAR 
+
+   Esta sección gestiona la navbar cuando el usuario ha iniciado
+   sesión. style.css define .user-menu con position:relative (base
+   anónima). Este bloque solo se activa cuando el JS añade .logged.
+
+   El círculo del avatar (.uav) aquí es distinto al de style.css:
+   style.css lo define cuadrado (border-radius: var(--r-xs)) para
+   el botón de acceder genérico. Aquí lo hacemos circular porque
+   es el avatar personalizado del usuario autenticado. */
+
+.user-menu {
+  position: relative;
+  display: none; /* oculto hasta que JS añade .logged */
+}
+.user-menu.logged { display: block; }
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 200, 240, 0.08);
+  border: 1px solid rgba(0, 200, 240, 0.15);
+  padding: 6px 14px 6px 6px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.user-info:hover {
+  background: rgba(0, 200, 240, 0.15);
+  border-color: rgba(0, 200, 240, 0.3);
+}
+
+/* Avatar circular con las iniciales del usuario.
+   El fondo es el mismo degradado que los botones primarios,
+   así mantiene coherencia con el sistema de color. */
+.uav {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #00c8f0, #1a6cff);
+  color: #020d1a;
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 8px rgba(0, 200, 240, 0.3);
+  flex-shrink: 0;
+}
+
+.uname-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  color: #e8f4ff;
+  font-weight: 500;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uarrow {
+  color: #66d9ff;
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+.user-menu.open .uarrow { transform: rotate(180deg); }
+
+
+/* 9. DROPDOWN DEL MENÚ DE USUARIO 
+
+   Bootstrap aplica display:none con alta especificidad a
+   .dropdown-menu. Como el HTML usa esa clase para aprovechar el
+   posicionamiento automático de Bootstrap, necesitamos competir
+   con display:block !important para poder controlar la visibilidad
+   con opacity+visibility (más suave que display).
+
+   Si en algún momento se refactoriza el HTML para no usar
+   .dropdown-menu de Bootstrap, se pueden quitar los !important
+   de position, top y right, y dejar solo el display. */
+
+.dropdown-menu-custom {
+  display: block !important;       /* anula el display:none de Bootstrap */
+  position: absolute !important;   /* necesario porque Bootstrap puede forzar static */
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  min-width: 200px;
+  background: #0a1a2f;
+  border: 1px solid rgba(0, 200, 240, 0.18);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+  z-index: 1000;
+}
+
+/* El JS añade .open al .user-menu padre, no al dropdown directamente */
+.user-menu.open .dropdown-menu-custom {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.dropdown-menu-custom a,
+.dropdown-menu-custom button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #b9d6ee;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.dropdown-menu-custom a:hover,
+.dropdown-menu-custom button:hover {
+  background: rgba(0, 200, 240, 0.1);
+  color: #e8f4ff;
+}
+
+.dropdown-menu-custom hr {
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* El botón de cerrar sesión usa rojo para que sea identificable
+   aunque estés leyendo rápido la lista */
+.dropdown-menu-custom .logout-btn         { color: #ff9ab0; }
+.dropdown-menu-custom .logout-btn:hover   {
+  background: rgba(244, 63, 94, 0.1);
+  color: #f43f5e;
+}
+
+
+/* 10. BOTÓN DE FAVORITO EN TARJETAS DE EMBALSE 
+
+   Se inserta dinámicamente por auth.js cuando detecta sesión activa.
+   El estado .is-fav lo gestiona también el JS al recibir la respuesta
+   del API. El fill del SVG necesita color explícito porque SVG no
+   hereda color del padre en todos los navegadores. */
+
+.fav-btn {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #8fb4d0;
+}
+.fav-btn:hover {
+  background: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffc107;
+  transform: scale(1.05);
+}
+.fav-btn.is-fav {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 152, 0, 0.15));
+  border-color: #ffc107;
+  color: #ffc107;
+}
+.fav-btn.is-fav svg { fill: #ffc107; }
+
+
+/* 11. RESPONSIVE
+
+   Solo ajustes del modal. El resto del responsive está en style.css.
+   No meter aquí media queries de otros componentes. */
+
+@media (max-width: 480px) {
+  .auth-modal-body  { padding: 32px 22px 22px; }
+  .auth-brand       { gap: 10px; margin-bottom: 20px; }
+  .auth-brand-logo  { width: 42px; height: 42px; }
+  .auth-brand-title { font-size: 1.2rem; }
+}
